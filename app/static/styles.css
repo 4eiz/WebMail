@@ -1,0 +1,286 @@
+:root {
+    --bg: #0b1220;
+    --bg-elev: #0f182a;
+    --card: #121c31;
+    --muted: #8aa2c0;
+    --text: #e6eef7;
+    --brand: #4da3ff;
+    --brand-strong: #2f7fe0;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(8, 16, 32, .45);
+    --border: 1px solid rgba(255,255,255,.06);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 20% -10%, rgba(38,73,128,.25), transparent 40%),
+                radial-gradient(1200px 600px at 120% 10%, rgba(38,73,128,.18), transparent 40%),
+                var(--bg);
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+}
+
+/* Layout */
+.wm-container {
+    width: min(1200px, 92vw);
+    margin: 0 auto;
+    padding: 24px 0 32px;
+}
+
+.wm-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: linear-gradient(180deg, rgba(15,24,42,.9), rgba(15,24,42,.6));
+    backdrop-filter: blur(10px);
+    border-bottom: var(--border);
+}
+
+.wm-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.wm-brand {
+    font-family: "Poppins", "Inter", sans-serif;
+    font-weight: 600;
+    letter-spacing: .3px;
+    color: var(--text);
+    font-size: 20px;
+}
+
+.wm-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.wm-nav .wm-link {
+    color: var(--muted);
+    text-decoration: none;
+    margin-left: 16px;
+    font-weight: 500;
+}
+
+.wm-nav .wm-link:hover {
+    color: var(--text);
+}
+
+/* Badge and logout */
+.wm-inline-form {
+    display: inline;
+    margin: 0;
+}
+
+.wm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(77,163,255,.12);
+    color: var(--text);
+    font-size: 14px;
+    border: 1px solid rgba(77,163,255,.25);
+}
+
+.wm-btn--ghost {
+    height: 36px;
+    padding: 0 12px;
+    background: transparent;
+    color: var(--muted);
+    border: var(--border);
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.wm-btn--ghost:hover {
+    color: var(--text);
+    border-color: rgba(77,163,255,.45);
+    box-shadow: 0 0 0 4px rgba(77,163,255,.10);
+}
+
+/* Title / Text */
+.wm-title {
+    margin: 24px 0 8px;
+    font-weight: 700;
+    letter-spacing: .2px;
+    font-size: clamp(20px, 3.4vw, 28px);
+}
+
+.wm-subtitle {
+    color: var(--muted);
+    margin-bottom: 16px;
+}
+
+/* Cards */
+.wm-card {
+    background: radial-gradient(800px 300px at -10% -10%, rgba(50,90,160,.12), transparent 50%),
+                var(--card);
+    border: var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+/* Auth */
+.wm-auth {
+    display: grid;
+    gap: 16px;
+    padding-top: 6vh;
+}
+
+.wm-form {
+    padding: 24px;
+    width: min(560px, 100%);
+    display: grid;
+    gap: 14px;
+}
+
+.wm-field {
+    display: grid;
+    gap: 8px;
+}
+
+.wm-field span {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.wm-field input {
+    background: var(--bg-elev);
+    border: var(--border);
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 12px;
+    outline: none;
+    transition: .2s border, .2s box-shadow;
+}
+
+.wm-field input:focus {
+    border-color: rgba(77,163,255,.5);
+    box-shadow: 0 0 0 4px rgba(77,163,255,.12);
+}
+
+.wm-btn {
+    --h: 46px;
+    height: var(--h);
+    display: inline-grid;
+    place-items: center;
+    padding: 0 18px;
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: .2px;
+    border: none;
+    cursor: pointer;
+    transition: transform .06s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.wm-btn--primary {
+    color: white;
+    background: linear-gradient(180deg, var(--brand), var(--brand-strong));
+    box-shadow: 0 10px 24px rgba(77,163,255,.25);
+}
+
+.wm-btn--primary:hover {
+    transform: translateY(-1px);
+}
+
+.wm-btn--primary:active {
+    transform: translateY(0);
+}
+/* Inbox: один столбец */
+.wm-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;                      /* чуть больше пространства между письмами */
+    padding-bottom: 32px;
+}
+
+.wm-mail {
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.wm-mail__head {
+    padding: 20px 22px 14px;
+    border-bottom: var(--border);
+}
+
+.wm-mail__meta {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.wm-mail__subject {
+    margin: 10px 0 0;
+    font-size: 20px;
+    line-height: 1.4;
+}
+
+.wm-mail__body {
+    padding: 0;
+    flex: 1 1 auto;
+}
+
+.wm-iframe {
+    width: 100%;
+    height: 640px;                  /* ← было 420px, теперь выше */
+    border: none;
+    display: block;
+    background: var(--bg-elev);
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* Для больших экранов ещё больше письма */
+@media (min-width: 1400px) {
+    .wm-iframe {
+        height: 800px;
+    }
+}
+
+/* Empty state */
+.wm-empty {
+    padding: 20px;
+    color: var(--muted);
+}
+
+/* Footer */
+.wm-footer {
+    border-top: var(--border);
+    padding-top: 18px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+/* Links */
+a {
+    color: var(--brand);
+}
+
+a:hover {
+    color: var(--brand-strong);
+}

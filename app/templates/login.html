@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Вход — WebMail{% endblock %}
+
+{% block content %}
+<section class="wm-auth">
+    <h1 class="wm-title">Вход в почту</h1>
+    <form method="post" action="/login" class="wm-card wm-form">
+        <label class="wm-field">
+            <span>Email</span>
+            <input type="email" name="email" placeholder="you@example.com" required />
+        </label>
+
+        <label class="wm-field">
+            <span>Пароль</span>
+            <input type="password" name="password" placeholder="••••••••" required />
+        </label>
+
+        <button type="submit" class="wm-btn wm-btn--primary">Войти</button>
+    </form>
+</section>
+{% endblock %}

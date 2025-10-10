@@ -1,0 +1,93 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.iml
+
+# Logs / temp / local files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local configs / secrets
+.env
+.env.local
+*.secret
+*.key
+*.pem
+
+# Compiled / distribution / packaging
+build/
+dist/
+*.egg-info/
+*.spec
+
+# Unit test / coverage
+.coverage
+.pytest_cache/
+htmlcov/
+nosetests.xml
+coverage.xml
+
+# Reports
+reports/
+logs/
+app.log
+
+# Jupyter / notebook / analysis
+.ipynb_checkpoints/
+*.ipynb
+
+# Static builds / cache
+__static_cache__/
+staticfiles/
+
+# OS / system files
+ehthumbs.db
+desktop.ini
+
+# PyInstaller output
+*.manifest
+*.spec
+dist/
+build/
+
+# Backup and misc
+*.old
+*.orig
+*.rej
+*.save
+*.bak
+*.tmp
+
+# Node / frontend artifacts (если используешь npm/yarn)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Editor settings
+*.sublime-workspace
+*.sublime-project
+
+# FastAPI reload cache
+*.db.sqlite3
+*.sqlite3
+*.sqlite

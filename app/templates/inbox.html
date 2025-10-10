@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Входящие — WebMail{% endblock %}
+
+{% block content %}
+<section class="wm-inbox">
+    <div class="wm-inbox__header">
+        <h1 class="wm-title">Входящие</h1>
+        <div class="wm-subtitle">Аккаунт: {{ email }}</div>
+    </div>
+
+    {% if messages|length == 0 %}
+        <div class="wm-empty wm-card">Писем не найдено.</div>
+    {% else %}
+    <div class="wm-grid">
+        {% for mail in messages %}
+        <article class="wm-card wm-mail">
+            <header class="wm-mail__head">
+                <div class="wm-mail__meta">
+                    <div class="wm-mail__from">{{ mail.from }}</div>
+                    <div class="wm-mail__date">{{ mail.date }}</div>
+                </div>
+                <h2 class="wm-mail__subject">{{ mail.subject }}</h2>
+            </header>
+
+    <!-- Вставляем HTML письма безопасно: через iframe с sandbox.
+        srcdoc требует экранирования — Jinja фильтр |e делает это корректно. -->
+            <div class="wm-mail__body">
+                <iframe
+                class="wm-iframe"
+                sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox"
+                referrerpolicy="no-referrer"
+                loading="lazy"
+                srcdoc="{{ (mail.body_html or '<div style=&quot;padding:1rem;color:#9fb3c8&quot;>Нет HTML, показываем текстовую версию</div>') | e }}">
+                </iframe>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

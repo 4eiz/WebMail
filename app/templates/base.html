@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{% block title %}WebMail{% endblock %}</title>
+
+    <!-- Шрифты -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    
+    <!-- Стили -->
+    <link rel="stylesheet" href="/static/styles.css" />
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header class="wm-header">
+        <div class="wm-container wm-header__inner">
+            <div class="wm-brand">WebMail</div>
+            <nav class="wm-nav">
+                {% set session_email = request.session.get('email') %}
+                {% if session_email %}
+                    <span class="wm-badge">{{ session_email }}</span>
+                    <form method="post" action="/logout" class="wm-inline-form">
+                        <button type="submit" class="wm-btn wm-btn--ghost">Выйти</button>
+                    </form>
+                    <a href="/inbox" class="wm-link">Входящие</a>
+                {% else %}
+                    <a href="/" class="wm-link">Войти</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <main class="wm-container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="wm-footer wm-container">
+        <span>© WebMail</span>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
