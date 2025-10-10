@@ -1,7 +1,5 @@
 # 📬 WebMail
 
-![banner](https://i.imgur.com/3spmSzz.png)
-
 **WebMail** is a modern asynchronous web mail client built with **FastAPI**.  
 It allows you to log into any email account and view messages directly in your browser.  
 The application is implemented in an **OOP** style with a sleek dark-blue interface and fully responsive design.
