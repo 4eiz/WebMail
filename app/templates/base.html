@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="ru" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{% block title %}WebMail{% endblock %}</title>
 
-    <!-- Шрифты -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
     
-    <!-- Стили -->
+    <!-- Styles -->
     <link rel="stylesheet" href="/static/styles.css" />
     {% block head %}{% endblock %}
 </head>
@@ -22,11 +22,11 @@
                 {% if session_email %}
                     <span class="wm-badge">{{ session_email }}</span>
                     <form method="post" action="/logout" class="wm-inline-form">
-                        <button type="submit" class="wm-btn wm-btn--ghost">Выйти</button>
+                        <button type="submit" class="wm-btn wm-btn--ghost">Logout</button>
                     </form>
-                    <a href="/inbox" class="wm-link">Входящие</a>
+                    <a href="/inbox" class="wm-link">Inbox</a>
                 {% else %}
-                    <a href="/" class="wm-link">Войти</a>
+                    <a href="/" class="wm-link">Login</a>
                 {% endif %}
             </nav>
         </div>

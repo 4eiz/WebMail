@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Входящие — WebMail{% endblock %}
+{% block title %}Inbox — WebMail{% endblock %}
 
 {% block content %}
 <section class="wm-inbox">
     <div class="wm-inbox__header">
-        <h1 class="wm-title">Входящие</h1>
-        <div class="wm-subtitle">Аккаунт: {{ email }}</div>
+        <h1 class="wm-title">Inbox</h1>
+        <div class="wm-subtitle">Account: {{ email }}</div>
     </div>
 
     {% if messages|length == 0 %}
-        <div class="wm-empty wm-card">Писем не найдено.</div>
+        <div class="wm-empty wm-card">No emails found.</div>
     {% else %}
     <div class="wm-grid">
         {% for mail in messages %}
@@ -22,15 +22,15 @@
                 <h2 class="wm-mail__subject">{{ mail.subject }}</h2>
             </header>
 
-    <!-- Вставляем HTML письма безопасно: через iframe с sandbox.
-        srcdoc требует экранирования — Jinja фильтр |e делает это корректно. -->
+            <!-- Insert HTML email safely using sandboxed iframe.
+                 srcdoc requires escaping — Jinja filter |e handles it properly. -->
             <div class="wm-mail__body">
                 <iframe
                 class="wm-iframe"
                 sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox"
                 referrerpolicy="no-referrer"
                 loading="lazy"
-                srcdoc="{{ (mail.body_html or '<div style=&quot;padding:1rem;color:#9fb3c8&quot;>Нет HTML, показываем текстовую версию</div>') | e }}">
+                srcdoc="{{ (mail.body_html or '<div style=&quot;padding:1rem;color:#9fb3c8&quot;>No HTML version available, displaying plain text instead.</div>') | e }}">
                 </iframe>
             </div>
         </article>

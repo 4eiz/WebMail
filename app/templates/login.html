@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Вход — WebMail{% endblock %}
+{% block title %}Login — WebMail{% endblock %}
 
 {% block content %}
 <section class="wm-auth">
-    <h1 class="wm-title">Вход в почту</h1>
+    <h1 class="wm-title">Mail Login</h1>
     <form method="post" action="/login" class="wm-card wm-form">
         <label class="wm-field">
             <span>Email</span>
@@ -11,11 +11,11 @@
         </label>
 
         <label class="wm-field">
-            <span>Пароль</span>
+            <span>Password</span>
             <input type="password" name="password" placeholder="••••••••" required />
         </label>
 
-        <button type="submit" class="wm-btn wm-btn--primary">Войти</button>
+        <button type="submit" class="wm-btn wm-btn--primary">Sign In</button>
     </form>
 </section>
 {% endblock %}
