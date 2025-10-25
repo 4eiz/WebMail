@@ -1,12 +1,12 @@
-# app/web.py
 from __future__ import annotations
 
+import contextlib
 import os
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -16,9 +16,10 @@ from starlette.templating import Jinja2Templates
 from modules.imap_client import IMAPClient
 
 
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATES_DIR = BASE_DIR / "templates"
-STATIC_DIR = BASE_DIR / "static"
+# ВАЖНО: берём корень проекта (…/WebMail), а не …/WebMail/app
+BASE_DIR = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = BASE_DIR / "app" / "templates"
+STATIC_DIR = BASE_DIR / "app" / "static"
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -71,21 +72,28 @@ class WebMailApp:
 
         @self.app.post("/login", tags=["auth"])
         async def login(request: Request, email: str = Form(...), password: str = Form(...)):
+            email = email.strip()
             client = IMAPClient(email, password)
             try:
                 await client.connect()
-            except Exception as e:
-                raise HTTPException(status_code=401, detail=f"Не удалось войти: {e}")
+            except Exception:
+                # Показываем единое безопасное сообщение об ошибке входа
+                return self.templates.TemplateResponse(
+                    "login.html",
+                    {"request": request, "error": "Неверный email или пароль"},
+                    status_code=401,
+                )
+            else:
+                # Сохраняем email и пароль в сессии, чтобы /inbox смог получить письма
+                request.session["email"] = email
+                request.session["password"] = password
+                return RedirectResponse(url="/inbox", status_code=303)
             finally:
-                await client.disconnect()
-
-            request.session["email"] = email
-            request.session["password"] = password
-            return RedirectResponse(url="/inbox", status_code=303)
+                with contextlib.suppress(Exception):
+                    await client.disconnect()
 
         @self.app.post("/logout", tags=["auth"])
         async def logout(request: Request):
-            # Чистим сессию и отправляем на логин
             request.session.clear()
             return RedirectResponse(url="/", status_code=303)
 

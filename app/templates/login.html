@@ -4,15 +4,28 @@
 {% block content %}
 <section class="wm-auth">
     <h1 class="wm-title">Mail Login</h1>
+
+    {% if error %}
+    <div class="wm-alert wm-alert--error" role="alert" aria-live="polite">
+        <div class="wm-alert__icon">!</div>
+        <div class="wm-alert__content">
+            <div class="wm-alert__title">Ошибка входа</div>
+            <div class="wm-alert__msg">{{ error }}</div>
+        </div>
+    </div>
+    {% endif %}
+
     <form method="post" action="/login" class="wm-card wm-form">
         <label class="wm-field">
             <span>Email</span>
-            <input type="email" name="email" placeholder="you@example.com" required />
+            <input type="email" name="email" placeholder="you@example.com"
+                   class="{% if error %}is-invalid{% endif %}" required />
         </label>
 
         <label class="wm-field">
             <span>Password</span>
-            <input type="password" name="password" placeholder="••••••••" required />
+            <input type="password" name="password" placeholder="••••••••"
+                   class="{% if error %}is-invalid{% endif %}" required />
         </label>
 
         <button type="submit" class="wm-btn wm-btn--primary">Sign In</button>
