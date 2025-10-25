@@ -80,7 +80,7 @@ class WebMailApp:
                 # Показываем единое безопасное сообщение об ошибке входа
                 return self.templates.TemplateResponse(
                     "login.html",
-                    {"request": request, "error": "Неверный email или пароль"},
+                    {"request": request, "error": "Invalid email or password"},
                     status_code=401,
                 )
             else:
