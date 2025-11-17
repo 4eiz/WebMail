@@ -329,3 +329,20 @@ a:hover {
     border-color: rgba(255, 77, 77, .55);
     box-shadow: 0 0 0 4px rgba(255, 77, 77, .15);
 }
+
+.wm-plaintext {
+    background: var(--bg-elev);
+    border-top: var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.wm-plaintext pre {
+    margin: 0;
+    padding: 16px 18px;
+    color: var(--text);
+    white-space: pre-wrap; /* переносим строки */
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "JetBrains Mono", monospace;
+    line-height: 1.5;
+    opacity: .95;
+}

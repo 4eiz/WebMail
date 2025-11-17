@@ -22,16 +22,29 @@
                 <h2 class="wm-mail__subject">{{ mail.subject }}</h2>
             </header>
 
-            <!-- Insert HTML email safely using sandboxed iframe.
-                 srcdoc requires escaping — Jinja filter |e handles it properly. -->
             <div class="wm-mail__body">
-                <iframe
-                class="wm-iframe"
-                sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox"
-                referrerpolicy="no-referrer"
-                loading="lazy"
-                srcdoc="{{ (mail.body_html or '<div style=&quot;padding:1rem;color:#9fb3c8&quot;>No HTML version available, displaying plain text instead.</div>') | e }}">
-                </iframe>
+
+                {# HTML версия письма #}
+                {% if mail.body_html %}
+                    <iframe
+                        class="wm-iframe"
+                        sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox"
+                        referrerpolicy="no-referrer"
+                        loading="lazy"
+                        srcdoc="{{ mail.body_html | e }}">
+                    </iframe>
+
+                {# Plain text версия #}
+                {% elif mail.body_text %}
+                    <div class="wm-plaintext">
+                        <pre>{{ mail.body_text }}</pre>
+                    </div>
+
+                {# Никакого контента #}
+                {% else %}
+                    <div class="wm-empty wm-card">No content.</div>
+                {% endif %}
+
             </div>
         </article>
         {% endfor %}
