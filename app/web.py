@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.templating import Jinja2Templates
 
-from modules.imap_client import IMAPClient
+from modules.imap_client import IMAPClient, NotLettersIMAPUnavailableError
 from modules.notletters_client import NotLettersClient
 from modules.errors import MailAuthError
 
@@ -21,9 +21,6 @@ from modules.errors import MailAuthError
 BASE_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = BASE_DIR / "app" / "templates"
 STATIC_DIR = BASE_DIR / "app" / "static"
-
-# Домены, которые автоматически идут через NotLetters API
-NOTLETTERS_DOMAINS = {"notletters.com"}
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -59,18 +56,6 @@ class WebMailApp:
         password = request.session.get("password")
         return {"email": email, "password": password} if email and password else None
 
-    def _resolve_provider(self, email: str) -> str:
-        """
-        Автоматически определяет провайдера по домену и наличию API-ключа:
-          - notletters.com + NOTLETTERS_API_KEY задан → "api"
-          - иначе → "imap"
-        """
-        domain = email.split("@")[-1].strip().lower()
-        api_key = os.getenv("NOTLETTERS_API_KEY", "")
-        if domain in NOTLETTERS_DOMAINS and api_key:
-            return "api"
-        return "imap"
-
     # ------------------------------------------------------------------ #
     #  Провайдер: IMAP                                                     #
     # ------------------------------------------------------------------ #
@@ -78,7 +63,7 @@ class WebMailApp:
     async def _fetch_messages_imap(
         self, email: str, password: str, limit: int = 20
     ) -> List[Dict[str, Any]]:
-        """Получить письма через IMAP (imaplib + SSL)."""
+        """Получить письма через IMAP."""
         client = IMAPClient(email, password)
         try:
             await client.connect()
@@ -103,20 +88,24 @@ class WebMailApp:
         return await client.get_letters(email, password, limit=limit)
 
     # ------------------------------------------------------------------ #
-    #  Диспетчер: выбор провайдера                                         #
+    #  Общий метод получения писем                                       #
     # ------------------------------------------------------------------ #
 
     async def _fetch_messages(
-        self,
-        email: str,
-        password: str,
-        limit: int = 20,
-        provider: str = "imap",
+        self, email: str, password: str, limit: int = 20
     ) -> List[Dict[str, Any]]:
-        """Вызывает нужный провайдер по значению provider (api / imap)."""
-        if provider == "api":
+        """
+        Сначала пробуем IMAP.
+        Если IMAP недоступен и IMAPClient бросил NotLettersIMAPUnavailableError —
+        автоматически переключаемся на NotLetters API.
+        """
+        try:
+            return await self._fetch_messages_imap(email, password, limit)
+        except NotLettersIMAPUnavailableError:
+            self.logger.info(
+                "IMAP недоступен для %s, переключаюсь на NotLetters API", email
+            )
             return await self._fetch_messages_notletters_api(email, password, limit)
-        return await self._fetch_messages_imap(email, password, limit)
 
     # ------------------------------------------------------------------ #
     #  Роуты                                                               #
@@ -137,21 +126,29 @@ class WebMailApp:
             password: str = Form(...),
         ):
             email = email.strip()
-            provider = self._resolve_provider(email)
-            self.logger.info("Попытка входа: %s (provider=%s)", email, provider)
+            self.logger.info("Попытка входа: %s", email)
 
             try:
-                if provider == "api":
+                # Пробуем IMAP; если IMAP недоступен — пробуем API
+                imap_client = IMAPClient(email, password)
+                try:
+                    await imap_client.connect()
+                    provider = "imap"
+                except NotLettersIMAPUnavailableError:
+                    self.logger.info(
+                        "IMAP недоступен, проверяем NotLetters API для %s", email
+                    )
                     api_key = os.getenv("NOTLETTERS_API_KEY", "")
+                    if not api_key:
+                        raise MailAuthError(
+                            "Невозможно подключиться: NOTLETTERS_API_KEY не задан."
+                        )
                     nl_client = NotLettersClient(api_key)
                     await nl_client.get_letters(email, password, limit=1)
-                else:
-                    client = IMAPClient(email, password)
-                    try:
-                        await client.connect()
-                    finally:
-                        with contextlib.suppress(Exception):
-                            await client.disconnect()
+                    provider = "api"
+                finally:
+                    with contextlib.suppress(Exception):
+                        await imap_client.disconnect()
             except Exception:
                 return self.templates.TemplateResponse(
                     "login.html",
@@ -162,6 +159,7 @@ class WebMailApp:
             request.session["email"] = email
             request.session["password"] = password
             request.session["provider"] = provider
+            self.logger.info("Вход успешен: %s (provider=%s)", email, provider)
             return RedirectResponse(url="/inbox", status_code=303)
 
         @self.app.post("/logout", tags=["auth"])
@@ -176,9 +174,14 @@ class WebMailApp:
                 return RedirectResponse(url="/", status_code=303)
             provider = request.session.get("provider", "imap")
             try:
-                messages = await self._fetch_messages(
-                    creds["email"], creds["password"], limit=limit, provider=provider
-                )
+                if provider == "api":
+                    messages = await self._fetch_messages_notletters_api(
+                        creds["email"], creds["password"], limit=limit
+                    )
+                else:
+                    messages = await self._fetch_messages_imap(
+                        creds["email"], creds["password"], limit=limit
+                    )
             except Exception as e:
                 self.logger.warning("Ошибка получения писем: %s", e)
                 request.session.clear()
