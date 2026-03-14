@@ -26,10 +26,6 @@ class NotLettersClient:
     """Обёртка над NotLetters REST API для получения писем."""
 
     def __init__(self, api_key: str, *, timeout: int = 15):
-        """
-        :param api_key: Bearer-токен для авторизации в API.
-        :param timeout: таймаут HTTP-запросов в секундах.
-        """
         self.api_key = api_key
         self.timeout = timeout
         self._headers = {
@@ -37,13 +33,10 @@ class NotLettersClient:
             "Authorization": f"Bearer {api_key}",
         }
 
-    # ---------- public API ----------
-
     async def get_me(self) -> Dict[str, Any]:
-        """Возвращает данные аккаунта: id, username, balance, rate_limit."""
+        """Возвращает данные аккаунта."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(f"{API_BASE}/me", headers=self._headers)
-
         if response.status_code == 401:
             raise MailAuthError("Неверный API-ключ NotLetters.")
         response.raise_for_status()
@@ -60,12 +53,7 @@ class NotLettersClient:
     ) -> List[Dict[str, Any]]:
         """
         Получает письма для конкретного email/password через NotLetters API.
-
-        Возвращает список словарей в том же формате, что и IMAPClient.get_messages(),
-        чтобы шаблон inbox.html ничего не знал о способе получения.
-
-        Поля каждого письма:
-            subject, from, to, date, message_id, body_text, body_html
+        Возвращает список в том же формате, что IMAPClient.get_messages().
         """
         payload: Dict[str, Any] = {
             "email": email,
@@ -86,32 +74,21 @@ class NotLettersClient:
 
         if response.status_code == 401:
             raise MailAuthError("Неверный email/пароль для NotLetters API.")
+        if response.status_code == 403:
+            raise MailAuthError("Доступ запрещён — проверьте API-ключ.")
         response.raise_for_status()
 
         result = response.json()
-        if result.get("code") != 200:
-            raise MailAuthError(
-                f"NotLetters API вернул ошибку: {result.get('message', 'unknown')}"
-            )
-
+        # API возвращает {"data": {"letters": [...]}} без поля code
         raw_letters: List[Dict[str, Any]] = result.get("data", {}).get("letters", [])
         messages = [self._normalize(letter) for letter in raw_letters]
-        # Новые письма сверху (API возвращает в порядке возрастания даты)
         messages.reverse()
         messages = messages[:limit]
-        logger.info(
-            "NotLetters API: получено %d писем для %s", len(messages), email
-        )
+        logger.info("NotLetters API: получено %d писем для %s", len(messages), email)
         return messages
-
-    # ---------- helpers ----------
 
     @staticmethod
     def _normalize(letter: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Приводит формат письма из API к единому формату, который используется
-        в шаблоне inbox.html (такой же, как у IMAPClient.get_messages).
-        """
         ts = letter.get("date", 0)
         try:
             date_str = datetime.fromtimestamp(ts).strftime("%a, %d %b %Y %H:%M:%S")
@@ -123,7 +100,6 @@ class NotLettersClient:
         from_str = f"{sender_name} <{sender}>" if sender_name else sender
 
         body_text: str = letter.get("letter", {}).get("text", "")
-        # Если нет HTML — делаем безопасный фолбэк из plain-text
         body_html: str = (
             "<pre style='white-space:pre-wrap;margin:0'>"
             + html.escape(body_text)
@@ -133,7 +109,7 @@ class NotLettersClient:
         return {
             "subject": letter.get("subject", ""),
             "from": from_str,
-            "to": "",           # NotLetters API не возвращает поле «кому»
+            "to": "",
             "date": date_str,
             "message_id": letter.get("id", ""),
             "body_text": body_text,
