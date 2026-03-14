@@ -2,6 +2,7 @@
 import asyncio
 import html
 import imaplib
+import socket
 import email
 from email.header import decode_header, make_header
 from email.message import Message
@@ -44,6 +45,14 @@ class IMAPClient:
         """Запуск блокирующих вызовов imaplib в отдельном потоке."""
         return await asyncio.to_thread(func, *args, **kwargs)
 
+    def _connect_imap_ssl(self, host: str, port: int) -> imaplib.IMAP4_SSL:
+        """
+        Создаёт IMAP4_SSL соединение с таймаутом.
+        Совместимо с Python 3.8+.
+        """
+        sock = socket.create_connection((host, port), timeout=self.timeout)
+        return imaplib.IMAP4_SSL(host, port, sock=sock)
+
     # ---------- connect / disconnect ----------
 
     async def connect(self):
@@ -53,7 +62,7 @@ class IMAPClient:
         for host in self._candidate_hosts():
             try:
                 self.server = await self._to_thread(
-                    imaplib.IMAP4_SSL, host, DEFAULT_PORT, None, None, None, self.timeout
+                    self._connect_imap_ssl, host, DEFAULT_PORT
                 )
                 result, _ = await self._to_thread(self.server.login, self.email, self.password)
                 if result == "OK":
@@ -66,7 +75,7 @@ class IMAPClient:
                     pass
                 self.server = None
                 last_error = MailAuthError(f"Не удалось войти в почту на {host}")
-            except (imaplib.IMAP4.error, OSError) as e:
+            except (imaplib.IMAP4.error, OSError, socket.timeout) as e:
                 logger.debug("Ошибка подключения к %s: %s", host, e)
                 last_error = e
                 self.server = None
