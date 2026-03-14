@@ -26,14 +26,11 @@ class IMAPClient:
         self.server: Optional[imaplib.IMAP4_SSL] = None
         self._connected_host: Optional[str] = None
 
-    # ---------- candidates & threading ----------
-
     def _candidate_hosts(self) -> List[str]:
         """
         Возвращает список IMAP-кандидатов.
         Если домен известен — его хост.
-        Если нет — пробуем только firstmail
-        (imap.notletters.com не работает, вместо него используется NotLetters API).
+        Если нет — пробуем только firstmail.
         """
         domain = self.email.split("@")[-1].strip().lower()
         host = IMAP_SERVERS.get(domain)
@@ -42,18 +39,20 @@ class IMAPClient:
         return ["imap.firstmail.ltd"]
 
     async def _to_thread(self, func, *args, **kwargs):
-        """Запуск блокирующих вызовов imaplib в отдельном потоке."""
+        """Запуск блокирующих вызовов в отдельном потоке."""
         return await asyncio.to_thread(func, *args, **kwargs)
 
     def _connect_imap_ssl(self, host: str, port: int) -> imaplib.IMAP4_SSL:
         """
-        Создаёт IMAP4_SSL соединение с таймаутом.
-        Совместимо с Python 3.8+.
+        Создаёт IMAP4_SSL с таймаутом.
+        Используем socket.setdefaulttimeout — работает на всех версиях Python.
         """
-        sock = socket.create_connection((host, port), timeout=self.timeout)
-        return imaplib.IMAP4_SSL(host, port, sock=sock)
-
-    # ---------- connect / disconnect ----------
+        old_timeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(self.timeout)
+        try:
+            return imaplib.IMAP4_SSL(host, port)
+        finally:
+            socket.setdefaulttimeout(old_timeout)
 
     async def connect(self):
         """Пробует все кандидаты по очереди. Успешный — фиксируем и выходим."""
@@ -98,8 +97,6 @@ class IMAPClient:
                 self.server = None
                 self._connected_host = None
 
-    # ---------- API ----------
-
     async def get_messages(
         self,
         *,
@@ -126,7 +123,6 @@ class IMAPClient:
 
         msg_ids = msg_ids[-limit:]
         fetch_items = "(RFC822)" if mark_seen else "(BODY.PEEK[])"
-
         messages: List[Dict[str, Any]] = []
 
         for msg_id in msg_ids:
@@ -163,10 +159,7 @@ class IMAPClient:
         logger.info("Загружено писем: %s (host=%s)", len(messages), self._connected_host or "-")
         return messages
 
-    # ---------- utils ----------
-
     def _decode_maybe_encoded(self, value: Optional[str]) -> str:
-        """Декодирует RFC2047-заголовки вроде =?utf-8?B?...?="""
         if value is None:
             return ""
         try:
@@ -175,7 +168,6 @@ class IMAPClient:
             return value
 
     def _extract_bodies(self, msg: Message) -> Tuple[str, str]:
-        """Возвращает текстовую и HTML-версии тела письма."""
         plain_parts: List[str] = []
         html_parts: List[str] = []
 
@@ -187,15 +179,12 @@ class IMAPClient:
                     continue
                 if disp and "attachment" in disp.lower():
                     continue
-
                 payload = part.get_payload(decode=True)
                 charset = part.get_content_charset() or "utf-8"
-
                 try:
                     text = (payload or b"").decode(charset, errors="replace")
                 except Exception:
                     text = (payload or b"").decode("utf-8", errors="replace")
-
                 if ctype == "text/plain":
                     plain_parts.append(text)
                 elif ctype == "text/html":
@@ -212,5 +201,4 @@ class IMAPClient:
         return ("\n".join(plain_parts).strip(), "\n".join(html_parts).strip())
 
     def _plaintext_to_minimal_html(self, text: str) -> str:
-        """Простой и безопасный фолбэк: экранируем и переведём \\n в <pre>."""
         return "<pre style='white-space:pre-wrap;margin:0'>" + html.escape(text) + "</pre>"
