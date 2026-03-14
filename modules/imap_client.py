@@ -13,22 +13,12 @@ from .logger import get_logger
 
 logger = get_logger(__name__)
 
-# Хосты, которые обслуживает NotLetters (IMAP выключён, используем API)
-NOTLETTERS_IMAP_HOSTS = {"imap.notletters.com"}
-
-
-class NotLettersIMAPUnavailableError(Exception):
-    """
-    Специальное исключение: единственный кандидат хост был NotLetters IMAP,
-    но он недоступен. Вышестоящий код должен переключиться на NotLetters API.
-    """
-    pass
-
 
 class IMAPClient:
     """Асинхронный IMAP клиент: подключение, авторизация, получение писем."""
 
-    def __init__(self, email_addr: str, password: str, *, timeout: int = 30):
+    # Таймаут снижен до 8 сек чтобы быстрее переключаться на API
+    def __init__(self, email_addr: str, password: str, *, timeout: int = 8):
         self.email = email_addr
         self.password = password
         self.timeout = timeout
@@ -40,9 +30,9 @@ class IMAPClient:
     def _candidate_hosts(self) -> List[str]:
         """
         Возвращает список IMAP-кандидатов.
-        Если домен известен — один хост.
+        Если домен известен — его хост.
         Если нет — пробуем только firstmail
-        (notletters IMAP не работает, вместо него используется API).
+        (imap.notletters.com не работает, вместо него используется NotLetters API).
         """
         domain = self.email.split("@")[-1].strip().lower()
         host = IMAP_SERVERS.get(domain)
@@ -51,17 +41,13 @@ class IMAPClient:
         return ["imap.firstmail.ltd"]
 
     async def _to_thread(self, func, *args, **kwargs):
-        """runs blocking imaplib calls in a thread."""
+        """Запуск блокирующих вызовов imaplib в отдельном потоке."""
         return await asyncio.to_thread(func, *args, **kwargs)
 
     # ---------- connect / disconnect ----------
 
     async def connect(self):
-        """
-        Пробует все IMAP-кандидаты по очереди.
-        Если единственный кандидат был NotLetters IMAP (недоступен) —
-        бросает NotLettersIMAPUnavailableError чтобы web.py переключился на API.
-        """
+        """Пробует все кандидаты по очереди. Успешный — фиксируем и выходим."""
         last_error: Optional[Exception] = None
 
         for host in self._candidate_hosts():
@@ -86,14 +72,6 @@ class IMAPClient:
                 self.server = None
                 continue
 
-        # Все IMAP-хосты не подошли.
-        # Если единственный кандидат был firstmail (т.e. неизвестный домен) —
-        # сигнализируем, чтобы web.py переключился на NotLetters API.
-        candidates = self._candidate_hosts()
-        if candidates == ["imap.firstmail.ltd"]:
-            raise NotLettersIMAPUnavailableError(
-                f"Все IMAP-хосты недоступны для {self.email}. Переключаюсь на NotLetters API."
-            )
         raise MailAuthError(
             f"Не удалось подключиться ни к одному IMAP-хосту для {self.email}. "
             f"Последняя ошибка: {last_error}"
