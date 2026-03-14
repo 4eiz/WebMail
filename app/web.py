@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = BASE_DIR / "app" / "templates"
 STATIC_DIR = BASE_DIR / "app" / "static"
 
-# Домены, которые обслуживает NotLetters
+# Домены, которые автоматически идут через NotLetters API
 NOTLETTERS_DOMAINS = {"notletters.com"}
 
 
@@ -59,6 +59,18 @@ class WebMailApp:
         password = request.session.get("password")
         return {"email": email, "password": password} if email and password else None
 
+    def _resolve_provider(self, email: str) -> str:
+        """
+        Автоматически определяет провайдера по домену и наличию API-ключа:
+          - notletters.com + NOTLETTERS_API_KEY задан → "api"
+          - иначе → "imap"
+        """
+        domain = email.split("@")[-1].strip().lower()
+        api_key = os.getenv("NOTLETTERS_API_KEY", "")
+        if domain in NOTLETTERS_DOMAINS and api_key:
+            return "api"
+        return "imap"
+
     # ------------------------------------------------------------------ #
     #  Провайдер: IMAP                                                     #
     # ------------------------------------------------------------------ #
@@ -81,15 +93,11 @@ class WebMailApp:
     async def _fetch_messages_notletters_api(
         self, email: str, password: str, limit: int = 20
     ) -> List[Dict[str, Any]]:
-        """
-        Получить письма через NotLetters REST API.
-        API-ключ берётся из переменной окружения NOTLETTERS_API_KEY.
-        """
+        """Получить письма через NotLetters REST API."""
         api_key = os.getenv("NOTLETTERS_API_KEY", "")
         if not api_key:
             raise MailAuthError(
-                "Переменная окружения NOTLETTERS_API_KEY не задана. "
-                "Используйте IMAP или добавьте ключ в .env."
+                "Переменная окружения NOTLETTERS_API_KEY не задана."
             )
         client = NotLettersClient(api_key)
         return await client.get_letters(email, password, limit=limit)
@@ -103,24 +111,12 @@ class WebMailApp:
         email: str,
         password: str,
         limit: int = 20,
-        provider: str = "auto",
+        provider: str = "imap",
     ) -> List[Dict[str, Any]]:
-        """
-        Маршрутизация по провайдеру:
-          - "api"  → NotLetters API
-          - "imap" → IMAP
-          - "auto" → API если домен в NOTLETTERS_DOMAINS, иначе IMAP
-        """
-        domain = email.split("@")[-1].strip().lower()
-
+        """Вызывает нужный провайдер по значению provider (api / imap)."""
         if provider == "api":
             return await self._fetch_messages_notletters_api(email, password, limit)
-        elif provider == "imap":
-            return await self._fetch_messages_imap(email, password, limit)
-        else:  # auto
-            if domain in NOTLETTERS_DOMAINS:
-                return await self._fetch_messages_notletters_api(email, password, limit)
-            return await self._fetch_messages_imap(email, password, limit)
+        return await self._fetch_messages_imap(email, password, limit)
 
     # ------------------------------------------------------------------ #
     #  Роуты                                                               #
@@ -139,45 +135,27 @@ class WebMailApp:
             request: Request,
             email: str = Form(...),
             password: str = Form(...),
-            provider: str = Form(default="auto"),
         ):
-            """
-            Принимает дополнительный параметр provider из формы:
-              - auto  (по умолчанию) — автовыбор по домену
-              - imap  — всегда IMAP
-              - api   — всегда NotLetters API
-            """
             email = email.strip()
-            provider = provider.strip().lower()
-            if provider not in ("auto", "imap", "api"):
-                provider = "auto"
+            provider = self._resolve_provider(email)
+            self.logger.info("Попытка входа: %s (provider=%s)", email, provider)
 
-            # Проверяем подключение при логине
             try:
-                if provider == "imap" or (
-                    provider == "auto"
-                    and email.split("@")[-1].strip().lower() not in NOTLETTERS_DOMAINS
-                ):
-                    # Для IMAP проверяем через IMAPClient.connect()
+                if provider == "api":
+                    api_key = os.getenv("NOTLETTERS_API_KEY", "")
+                    nl_client = NotLettersClient(api_key)
+                    await nl_client.get_letters(email, password, limit=1)
+                else:
                     client = IMAPClient(email, password)
                     try:
                         await client.connect()
                     finally:
                         with contextlib.suppress(Exception):
                             await client.disconnect()
-                else:
-                    # Для NotLetters API проверяем через get_letters с limit=1
-                    api_key = os.getenv("NOTLETTERS_API_KEY", "")
-                    if not api_key:
-                        raise MailAuthError(
-                            "NOTLETTERS_API_KEY не задан. Используйте IMAP."
-                        )
-                    nl_client = NotLettersClient(api_key)
-                    await nl_client.get_letters(email, password, limit=1)
-            except Exception as exc:
+            except Exception:
                 return self.templates.TemplateResponse(
                     "login.html",
-                    {"request": request, "error": str(exc)},
+                    {"request": request, "error": "Invalid email or password"},
                     status_code=401,
                 )
 
@@ -196,7 +174,7 @@ class WebMailApp:
             creds = self._get_credentials(request)
             if not creds:
                 return RedirectResponse(url="/", status_code=303)
-            provider = request.session.get("provider", "auto")
+            provider = request.session.get("provider", "imap")
             try:
                 messages = await self._fetch_messages(
                     creds["email"], creds["password"], limit=limit, provider=provider
@@ -213,7 +191,6 @@ class WebMailApp:
                     "email": creds["email"],
                     "messages": messages,
                     "limit": limit,
-                    "provider": provider,
                 },
             )
 
