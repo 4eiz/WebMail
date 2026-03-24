@@ -84,7 +84,6 @@ class NotLettersClient:
         result = response.json()
         raw_letters: List[Dict[str, Any]] = result.get("data", {}).get("letters", [])
         messages = [self._normalize(letter) for letter in raw_letters]
-        messages.reverse()
         logger.info("NotLetters API: получено %d писем для %s", len(messages), email)
         return messages
 
