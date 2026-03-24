@@ -50,5 +50,16 @@
         {% endfor %}
     </div>
     {% endif %}
+
+    <div class="wm-pagination">
+        {% if page > 1 %}
+            <a class="wm-btn" href="/inbox?page={{ page - 1 }}&limit={{ limit }}">← Newer</a>
+        {% endif %}
+        <span class="wm-page-num">Page {{ page }}</span>
+        {% if messages|length == limit %}
+            <a class="wm-btn" href="/inbox?page={{ page + 1 }}&limit={{ limit }}">Older →</a>
+        {% endif %}
+    </div>
+
 </section>
 {% endblock %}

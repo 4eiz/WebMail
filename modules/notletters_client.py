@@ -50,6 +50,7 @@ class NotLettersClient:
         search: Optional[str] = None,
         star: Optional[bool] = None,
         limit: int = 50,
+        page: int = 1,
     ) -> List[Dict[str, Any]]:
         """
         Получает письма для конкретного email/password через NotLetters API.
@@ -59,6 +60,8 @@ class NotLettersClient:
             "email": email,
             "password": password,
             "filters": {},
+            "page": page,
+            "limit": limit,
         }
         if search:
             payload["filters"]["search"] = search
@@ -79,11 +82,9 @@ class NotLettersClient:
         response.raise_for_status()
 
         result = response.json()
-        # API возвращает {"data": {"letters": [...]}} без поля code
         raw_letters: List[Dict[str, Any]] = result.get("data", {}).get("letters", [])
         messages = [self._normalize(letter) for letter in raw_letters]
         messages.reverse()
-        messages = messages[:limit]
         logger.info("NotLetters API: получено %d писем для %s", len(messages), email)
         return messages
 
@@ -100,11 +101,14 @@ class NotLettersClient:
         from_str = f"{sender_name} <{sender}>" if sender_name else sender
 
         body_text: str = letter.get("letter", {}).get("text", "")
-        body_html: str = (
-            "<pre style='white-space:pre-wrap;margin:0'>"
-            + html.escape(body_text)
-            + "</pre>"
-        ) if body_text else ""
+        body_html: str = letter.get("letter", {}).get("html", "")
+
+        if not body_html and body_text:
+            body_html = (
+                "<pre style='white-space:pre-wrap;margin:0'>"
+                + html.escape(body_text)
+                + "</pre>"
+            )
 
         return {
             "subject": letter.get("subject", ""),

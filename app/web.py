@@ -77,14 +77,14 @@ class WebMailApp:
     # ------------------------------------------------------------------ #
 
     async def _fetch_messages_api(
-        self, email: str, password: str, limit: int = 20
+        self, email: str, password: str, limit: int = 20, page: int = 1
     ) -> List[Dict[str, Any]]:
         """Получить письма через NotLetters REST API."""
         api_key = os.getenv("NOTLETTERS_API_KEY", "")
         if not api_key:
             raise MailAuthError("Переменная NOTLETTERS_API_KEY не задана.")
         client = NotLettersClient(api_key)
-        return await client.get_letters(email, password, limit=limit)
+        return await client.get_letters(email, password, limit=limit, page=page)
 
     # ------------------------------------------------------------------ #
     #  Общий метод: IMAP → если не работает → NotLetters API           #
@@ -164,7 +164,7 @@ class WebMailApp:
             return RedirectResponse(url="/", status_code=303)
 
         @self.app.get("/inbox", tags=["ui"])
-        async def inbox(request: Request, limit: int = 20):
+        async def inbox(request: Request, limit: int = 20, page: int = 1):
             creds = self._get_credentials(request)
             if not creds:
                 return RedirectResponse(url="/", status_code=303)
@@ -173,7 +173,7 @@ class WebMailApp:
             try:
                 if provider == "api":
                     messages = await self._fetch_messages_api(
-                        creds["email"], creds["password"], limit=limit
+                        creds["email"], creds["password"], limit=limit, page=page
                     )
                 else:
                     messages = await self._fetch_messages_imap(
@@ -191,6 +191,7 @@ class WebMailApp:
                     "email": creds["email"],
                     "messages": messages,
                     "limit": limit,
+                    "page": page,
                 },
             )
 
