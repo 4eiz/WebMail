@@ -18,12 +18,18 @@ logger = get_logger(__name__)
 
 
 def _parse_date(date_str: str) -> datetime:
-    """Парсит RFC 2822 дату в datetime.
-    Возвращает datetime.min если разбор не удался (такие письма уйдут в конец списка)."""
+    """Парсит RFC 2822 дату в UTC datetime.
+    Всегда возвращает offset-aware datetime (в UTC),
+    чтобы избежать ошибки сравнения offset-naive и offset-aware.
+    """
     if not date_str:
         return datetime.min.replace(tzinfo=timezone.utc)
     try:
-        return email.utils.parsedate_to_datetime(date_str)
+        dt = email.utils.parsedate_to_datetime(date_str)
+        # Если дата без таймзоны (offset-naive) — считаем её UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
     except Exception:
         return datetime.min.replace(tzinfo=timezone.utc)
 
@@ -152,7 +158,7 @@ class IMAPClient:
         """Возвращает список писем в виде словарей (включая HTML).
 
         Для Rambler-аккаунтов автоматически добавляет письма из папки Спам.
-        Все письма сортируются по парсенной дате от новых к старым.
+        Все письма сортируются по дате от новых к старым.
         """
         if not self.server:
             raise MailAuthError("Нет активного соединения IMAP.")
@@ -183,7 +189,7 @@ class IMAPClient:
             else:
                 logger.info("Rambler: папка спама не найдена, показываем только INBOX")
 
-        # Сортируем все письма по парсенной дате, новые сначала
+        # Сортируем все письма по парсенной UTC-дате, новые сначала
         messages.sort(key=lambda m: _parse_date(m.get("date", "")), reverse=True)
         return messages
 
