@@ -8,7 +8,7 @@ from email.header import decode_header, make_header
 from email.message import Message
 from typing import Any, Dict, List, Optional, Tuple
 
-from .imap_config import IMAP_SERVERS, DEFAULT_PORT
+from .imap_config import IMAP_SERVERS, DEFAULT_PORT, RAMBLER_SPAM_FOLDERS
 from .errors import UnknownMailDomainError, MailAuthError
 from .logger import get_logger
 
@@ -37,6 +37,11 @@ class IMAPClient:
         if host:
             return [host]
         return ["imap.firstmail.ltd"]
+
+    def _is_rambler(self) -> bool:
+        """Проверяет, является ли адрес Rambler-почтой."""
+        domain = self.email.split("@")[-1].strip().lower()
+        return domain in ("rambler.ru", "lenta.ru", "myrambler.ru", "ro.ru", "rambler.ua")
 
     async def _to_thread(self, func, *args, **kwargs):
         """Запуск блокирующих вызовов в отдельном потоке."""
@@ -97,6 +102,32 @@ class IMAPClient:
                 self.server = None
                 self._connected_host = None
 
+    async def _find_spam_folder(self) -> Optional[str]:
+        """
+        Определяет реальное имя папки спама из списка возможных вариантов.
+        Возвращает первое найденное имя или None.
+        """
+        if not self.server:
+            return None
+        try:
+            typ, folders = await self._to_thread(self.server.list)
+            if typ != "OK":
+                return None
+            folder_names: List[str] = []
+            for f in (folders or []):
+                if isinstance(f, bytes):
+                    # Формат: (\Noselect) "/" "INBOX"
+                    parts = f.decode(errors="replace").split('"')
+                    name = parts[-1].strip().strip('"') if len(parts) >= 1 else ""
+                    if name:
+                        folder_names.append(name)
+            for candidate in RAMBLER_SPAM_FOLDERS:
+                if candidate in folder_names:
+                    return candidate
+        except Exception as e:
+            logger.warning("Не удалось получить список папок: %s", e)
+        return None
+
     async def get_messages(
         self,
         *,
@@ -105,7 +136,54 @@ class IMAPClient:
         limit: int = 50,
         mark_seen: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Возвращает список писем в виде словарей (включая HTML)."""
+        """Возвращает список писем в виде словарей (включая HTML).
+
+        Для Rambler-аккаунтов автоматически добавляет письма из папки Спам,
+        чтобы отображались все письма включая спам.
+        """
+        if not self.server:
+            raise MailAuthError("Нет активного соединения IMAP.")
+
+        messages = await self._get_messages_from_mailbox(
+            mailbox=mailbox, criteria=criteria, limit=limit, mark_seen=mark_seen
+        )
+
+        # Для Rambler — дополнительно грузим спам-папку
+        if self._is_rambler():
+            spam_folder = await self._find_spam_folder()
+            if spam_folder:
+                logger.info("Rambler: загружаю спам из папки '%s'", spam_folder)
+                try:
+                    spam_messages = await self._get_messages_from_mailbox(
+                        mailbox=spam_folder,
+                        criteria=criteria,
+                        limit=limit,
+                        mark_seen=mark_seen,
+                        is_spam=True,
+                    )
+                    messages = messages + spam_messages
+                    # Сортируем все письма по дате (новые сначала, без дат — в конец)
+                    messages.sort(key=lambda m: m.get("date") or "", reverse=True)
+                    logger.info(
+                        "Rambler: итого писем после добавления спама: %s", len(messages)
+                    )
+                except Exception as e:
+                    logger.warning("Не удалось загрузить спам-папку '%s': %s", spam_folder, e)
+            else:
+                logger.info("Rambler: папка спама не найдена, показываем только INBOX")
+
+        return messages
+
+    async def _get_messages_from_mailbox(
+        self,
+        *,
+        mailbox: str,
+        criteria: str,
+        limit: int,
+        mark_seen: bool,
+        is_spam: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Вспомогательный метод: получает письма из конкретного ящика/папки."""
         if not self.server:
             raise MailAuthError("Нет активного соединения IMAP.")
 
@@ -152,11 +230,18 @@ class IMAPClient:
                     "message_id": msg_id_val,
                     "body_text": body_text,
                     "body_html": body_html,
+                    "is_spam": is_spam,
+                    "mailbox": mailbox,
                 }
             )
 
         messages.reverse()
-        logger.info("Загружено писем: %s (host=%s)", len(messages), self._connected_host or "-")
+        logger.info(
+            "Загружено писем из '%s': %s (host=%s)",
+            mailbox,
+            len(messages),
+            self._connected_host or "-",
+        )
         return messages
 
     def _decode_maybe_encoded(self, value: Optional[str]) -> str:
