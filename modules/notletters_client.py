@@ -54,7 +54,8 @@ class NotLettersClient:
     ) -> List[Dict[str, Any]]:
         """
         Получает письма для конкретного email/password через NotLetters API.
-        Возвращает список в том же формате, что IMAPClient.get_messages().
+        Возвращает список в том же формате, что IMAPClient.get_messages(),
+        отсортированный от новых к старым.
         """
         payload: Dict[str, Any] = {
             "email": email,
@@ -83,6 +84,10 @@ class NotLettersClient:
 
         result = response.json()
         raw_letters: List[Dict[str, Any]] = result.get("data", {}).get("letters", [])
+
+        # Сортируем по таймстампу до нормализации (он ещё Unix-целочисленный)
+        raw_letters.sort(key=lambda x: x.get("date", 0), reverse=True)
+
         messages = [self._normalize(letter) for letter in raw_letters]
         logger.info("NotLetters API: получено %d писем для %s", len(messages), email)
         return messages
