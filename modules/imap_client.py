@@ -4,6 +4,8 @@ import html
 import imaplib
 import socket
 import email
+import email.utils
+from datetime import datetime, timezone
 from email.header import decode_header, make_header
 from email.message import Message
 from typing import Any, Dict, List, Optional, Tuple
@@ -13,6 +15,17 @@ from .errors import UnknownMailDomainError, MailAuthError
 from .logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _parse_date(date_str: str) -> datetime:
+    """Парсит RFC 2822 дату в datetime.
+    Возвращает datetime.min если разбор не удался (такие письма уйдут в конец списка)."""
+    if not date_str:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        return email.utils.parsedate_to_datetime(date_str)
+    except Exception:
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 
 class IMAPClient:
@@ -138,8 +151,8 @@ class IMAPClient:
     ) -> List[Dict[str, Any]]:
         """Возвращает список писем в виде словарей (включая HTML).
 
-        Для Rambler-аккаунтов автоматически добавляет письма из папки Спам,
-        чтобы отображались все письма включая спам.
+        Для Rambler-аккаунтов автоматически добавляет письма из папки Спам.
+        Все письма сортируются по парсенной дате от новых к старым.
         """
         if not self.server:
             raise MailAuthError("Нет активного соединения IMAP.")
@@ -162,8 +175,6 @@ class IMAPClient:
                         is_spam=True,
                     )
                     messages = messages + spam_messages
-                    # Сортируем все письма по дате (новые сначала, без дат — в конец)
-                    messages.sort(key=lambda m: m.get("date") or "", reverse=True)
                     logger.info(
                         "Rambler: итого писем после добавления спама: %s", len(messages)
                     )
@@ -172,6 +183,8 @@ class IMAPClient:
             else:
                 logger.info("Rambler: папка спама не найдена, показываем только INBOX")
 
+        # Сортируем все письма по парсенной дате, новые сначала
+        messages.sort(key=lambda m: _parse_date(m.get("date", "")), reverse=True)
         return messages
 
     async def _get_messages_from_mailbox(
@@ -235,7 +248,6 @@ class IMAPClient:
                 }
             )
 
-        messages.reverse()
         logger.info(
             "Загружено писем из '%s': %s (host=%s)",
             mailbox,
